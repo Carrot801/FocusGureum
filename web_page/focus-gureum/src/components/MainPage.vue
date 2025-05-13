@@ -8,6 +8,7 @@
 
         <h2>User's Name Page</h2>
 
+        {{ }}
         <!-- Current Month and Year -->
         <h3>{{ month }} {{ year }}</h3>
 
@@ -147,27 +148,7 @@ export default {
                 name: "Image 1",
             },
         ],
-        tasks: [
-        {
-          id: 1,
-          text: "Task 1",
-          isActive: false,
-        },
-        {
-          id: 2,
-          text: "Task 2",
-          isActive: false,
-        },
-        {
-          id: 3,
-          text: "Task 3",
-          isActive: false,
-        },  {
-          id: 4,
-          text: "Task 4",
-          isActive: false,
-        }
-      ]
+        tasks: [ ]
     }
   },
   computed:{
@@ -176,6 +157,111 @@ export default {
     },
   },
   methods:{
+    async postDailyTask(description,status){
+        try{
+            const response = await fetch("api/dailyTasks",{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    description: description,
+                    status: status,
+                }),
+            }); 
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+console.log(data);
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
+    async getDailyTasks(){
+        try{
+            const response = await fetch("api/dailyTasks",{
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                console.log(data);
+                const tasks = JSON.parse(data);
+                this.tasks = tasks.map(task => ({
+                    id: task.id,
+                    text: task.description,
+                    isActive: task.status,
+                }));
+                this.tasks.sort((a,b) => {
+                    if(a.isActive && !b.isActive) return 1;
+                    if(!a.isActive && b.isActive) return -1;
+                    return a.id - b.id;
+                });
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
+    async updateDailyTask(taskId,description,status){
+
+        try{
+            const response = await fetch("api/dailyTasks",{
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: taskId,
+                    description: description,
+                    status: status,
+                }),
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                this.getDailyTasks();
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
+    async deleteDailyTask(taskId){
+        const params = new URLSearchParams();
+        params.append('id', taskId);
+        try { const response = await fetch(`api/dailyTasks?${params.toString()}`,{
+            method: 'DELETE',
+            headers: {
+                'Content-type': 'application/json'  
+            },
+            body: JSON.stringify({
+                id: taskId,
+            }),
+        });
+        if(!response.ok){
+            console.error("Netwrork response was not ok " + response.statusText);
+        }else {
+            const data = await response.text();
+            console.log(data);
+            this.getDailyTasks();
+        }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
     toggleTask(taskId){
         this.tasks = this.tasks.map(task => 
             task.id === taskId ? {...task, active: !task.active,isActive: !task.isActive} : task
@@ -185,6 +271,7 @@ export default {
             if(!a.active && b.active) return -1;
             return a.id - b.id;
         });
+        this.updateDailyTask(taskId,this.tasks[taskId-1].text,!this.tasks[taskId-1].isActive);
     },
     getTaskImage(isActive){
         return isActive ? this.checkBoxActive : this.checkBoxUnactive;
@@ -193,11 +280,13 @@ export default {
         this.isAddingTask = true;
     },
     cancelTask(){
+        this.deleteDailyTask("2");
         this.isAddingTask = false;
         this.newTaskText = '';
     },
     addTask(){
         if(this.newTaskText.trim()){
+            this.postDailyTask(this.newTaskText,false);
             const newTask = {
                 id: this.tasks.length + 1,
                 text: this.newTaskText,
@@ -245,7 +334,10 @@ export default {
         }
     }
     
-  }
+  },
+  mounted() {
+    this.getDailyTasks();
+  },
 }
 </script>
 
