@@ -35,6 +35,28 @@
             </div>
         </div>
 
+        <!-- Habit for daily goals -->
+        <div class="scrollable-container">
+        <div class="habit-goals">
+            <div class="habit-container">
+                <h3>Habit Goals</h3>
+                <div v-for ="habit in habits" :key="habit.id" class="habit"
+                :class="{active: habit.active}" @click="toggleHabit(habit.id)">
+                <img :src="getHabitImage(habit.isActive)" alt="Habit Checkbox" class="toggle-image" />
+                <span> {{ habit.text }}</span>
+                </div>
+            </div>    
+        <!-- Add new habit -->
+            <div v-if="isAddingHabit" class="new-habit">
+                <input v-model="newHabitText" type="text" placeholder="Enter habit..." class="new-habit-input"/>
+                <div class="habit-button">
+                    <button @click="addHabit" class="add-habit">Add Habbit</button>
+                    <button @click="cancelHabit" class="cancel-habit">Cancel</button>
+                </div>
+                </div>
+            <button v-else @click="startAddingHabit" class="add-habit-button">➕new habit</button>
+            </div>
+        </div>
             <!-- Gallery -->
             <div class="gallery-container">
                 <div class="gallery-title">
@@ -68,11 +90,13 @@
                 </div>
             </div>
 
+            
     </div>
     
 </template>
 
 <script>
+
 export default {
   name: 'MainPage',
   data() {
@@ -86,8 +110,10 @@ export default {
         year: currentDate.getFullYear(),
         isActive: false,
         isAddingTask: false,
-        selectedImage: null,
         newTaskText: '',
+        isAddingHabit: false,
+        selectedImage: null,
+        newHabitText: '',
         showGalleryWindow: false,
         checkBoxUnactive: require('@/assets/checkbox-unactive.png'),
         checkBoxActive: require('@/assets/checkbox-active.png'),
@@ -148,10 +174,30 @@ export default {
                 name: "Image 1",
             },
         ],
-        tasks: [ ]
+        tasks: [ ],
+        habits: [
+            {        
+                id: 1,
+                text: "Habit 1",
+                isActive: false,
+            },
+            {        
+                id: 2,
+                text: "Habit 2",
+                isActive: false,
+            },
+            {        
+                id: 3,
+                text: "Habit 3",
+                isActive: false,
+            },
+        ],
     }
   },
   computed:{
+    habitCheckbox(){
+        return this.isActive ? this.checkBoxActive : this.checkBoxUnactive;
+    },
     taskCheckbox(){
         return this.isActive ? this.checkBoxActive : this.checkBoxUnactive;
     },
@@ -159,7 +205,7 @@ export default {
   methods:{
     async postDailyTask(description,status){
         try{
-            const response = await fetch("api/dailyTasks",{
+            const response = await fetch("api/tasks?id=1",{
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -174,7 +220,6 @@ export default {
             }
             else {
                 const data = await response.text();
-console.log(data);
                 console.log(data);
             }
         }catch(error){
@@ -184,7 +229,7 @@ console.log(data);
     },
     async getDailyTasks(){
         try{
-            const response = await fetch("api/dailyTasks",{
+            const response = await fetch("api/tasks?id=1",{
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -199,7 +244,7 @@ console.log(data);
                 const tasks = JSON.parse(data);
                 this.tasks = tasks.map(task => ({
                     id: task.id,
-                    text: task.description,
+                    text: task.name,
                     isActive: task.status,
                 }));
                 this.tasks.sort((a,b) => {
@@ -280,7 +325,6 @@ console.log(data);
         this.isAddingTask = true;
     },
     cancelTask(){
-        this.deleteDailyTask("2");
         this.isAddingTask = false;
         this.newTaskText = '';
     },
@@ -295,6 +339,64 @@ console.log(data);
             this.tasks.push(newTask);
             this.cancelTask();
         }
+    },
+     toggleHabit(habitId){
+        this.habits = this.habits.map(habit => 
+            habit.id === habitId ? {...habit, active: !habit.active,isActive: !habit.isActive} : habit
+        );
+        this.habits.sort((a,b) => {
+            if(a.active && !b.active) return 1;
+            if(!a.active && b.active) return -1;
+            return a.id - b.id;
+        });
+        this.updateDailyTask(habitId,this.habits[habitId-1].text,!this.habits[habitId-1].isActive);
+    },
+    getHabitImage(isActiveHabit){
+        return isActiveHabit ? this.checkBoxActive : this.checkBoxUnactive;
+    },
+    startAddingHabit(){
+        this.isAddingHabit = true;
+    },
+    cancelHabit(){
+        this.isAddingHabit = false;
+        this.newHabitText = '';
+    },
+    addHabit(){
+        if(this.newHabitText.trim()){
+            this.postHabit(this.newHabitText,false);
+            const newHabit = {
+                id: this.habits.length + 1,
+                text: this.newHabitText,
+                isActive: false,
+            };
+            this.habits.push(newHabit);
+            this.cancelHabit();
+        }
+    },
+    
+    async postHabit(description,status){
+        try{
+            const response = await fetch("api/dailyTasks",{
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    description: description,
+                    status: status,
+                }),
+            }); 
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
     },
     startAddingGalleryItem(){
         this.showGalleryWindow = true;
@@ -377,8 +479,9 @@ h2 {
     padding: 0;
 }
 .daily-goals {
-    margin-top: 200px;
     margin-left: 60px;
+    top: 450px;
+    position: absolute;
 }
 .task-container{
     width: 270px;
@@ -463,6 +566,100 @@ h2 {
 }
 .add-task,
 .cancel-task{
+    width: 100px;
+    height: 40px;
+    align-items: center;
+    cursor: pointer;
+    border: 1px solid gray;
+    border-radius: 10px;
+    background-color: #f7c4e1;
+}
+
+
+/* habit container */
+.habit-goals {
+    margin-left: 1110px;
+    top: 450px;
+    position: absolute;
+}
+.habit-container{
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+    gap:10px;
+    max-height: 300px;
+    overflow: auto;
+    position: relative;
+}
+.habit{
+    width: 310px;
+    display: flex;
+    align-items: center;
+    height: 18px;
+    padding:10px;
+    gap: 10px;
+    border: 1px solid gray;
+    border-radius: 10px;
+    background-color: white;
+    transition: background-color 0.3s;
+    cursor: pointer;
+}
+.habit:hover{
+    background-color: #f27bbe;
+}
+.habit.active{
+    background-color: #f7c4e1;
+}
+.habit.active:hover{
+    background-color: #a28f9a;
+}
+.add-habit-button{
+    width: 220px;
+    height: 40px; 
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid gray;
+    border-radius: 10px;
+    margin-top: 10px;
+    margin-left: 10px;
+    background-color: #f7c4e1;
+}
+.new-habit{
+    width: 250px;
+    display: flex;
+    flex-direction: column;
+    align-items: left;
+    margin-top: 10px;
+    gap:10px;
+    max-height: 300px;
+    position: relative;
+}
+.habit-button{
+    width: 250px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 15px;
+}
+.new-habit-input{
+    width: 220px;
+    display: flex;
+    align-items: center;
+    height: 18px;
+    padding:10px;
+    gap: 10px;
+    border: 1px solid gray;
+    border-radius: 10px;
+    background-color: white;
+    transition: background-color 0.3s;
+    cursor: pointer;
+}
+.add-habit,
+.cancel-habit{
     width: 100px;
     height: 40px;
     align-items: center;
