@@ -1,6 +1,9 @@
 <template>
     <div class = "mainPage">
 
+        <div id="app">
+    <router-view />
+  </div>
         <!-- Banner -->
         <img src = "../assets/image.png" alt="Banner" class="banner" />
         <!-- Profile Picture -->
@@ -18,7 +21,7 @@
         <div class="task-container">
             <h3>Daily Goals</h3>
             <div v-for ="task in tasks" :key="task.id" class="task"
-            :class="{active: task.active}" @click="toggleTask(task.id)">
+            :class="{active: task.isActive}" @click="toggleTask(task.id)">
             <img :src="getTaskImage(task.isActive)" alt="Task Checkbox" class="toggle-image" />
             <span> {{ task.text }}</span>
             </div>
@@ -68,10 +71,16 @@
                 <div class="scrollable-container">
                 <div class="gallery">
 
-                    <div v-for="(image,index) in gallery" :key="index" class="gallery-item">
-                        <img :src="image.imgUrl" alt="Gallery Image" />
-                        <span>Image {{ image.name }}</span>
-                    </div>
+                   <router-link
+  v-for="(image,index) in gallery"
+  :key="index"
+  :to="{ name: 'GalleryItemDetail', params: { name: image.name } }"
+  class="gallery-item"
+>
+  <img :src="image.imgUrl" alt="Gallery Image" />
+  <span>Image {{ image.name }}</span>
+</router-link>
+
                     </div>  
                 </div>
                 <div v-if="showGalleryWindow" class="gallery-item-window">
@@ -229,7 +238,7 @@ export default {
     },
     async getDailyTasks(){
         try{
-            const response = await fetch("api/tasks?id=1",{
+            const response = await fetch("api/tasks",{
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
@@ -258,19 +267,38 @@ export default {
         }
         
     },
-    async updateDailyTask(taskId,description,status){
+    async updateDailyTaskStatus(taskId){
 
         try{
-            const response = await fetch("api/dailyTasks",{
-                method: 'PUT',
+             const response = await fetch(`api/tasks/${taskId}/toggle`,{
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                this.getDailyTasks();
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
+    async updateDailyTaskName(taskId){
+
+        try{
+             const response = await fetch(`api/tasks/${taskId}/name`,{
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    id: taskId,
-                    description: description,
-                    status: status,
-                }),
+                    name: this.tasks[taskId-1].text,
+                })
             });
             if(!response.ok){
                 throw new Error("Network response was not ok" + response.statusText);
@@ -285,9 +313,7 @@ export default {
         }
     },
     async deleteDailyTask(taskId){
-        const params = new URLSearchParams();
-        params.append('id', taskId);
-        try { const response = await fetch(`api/dailyTasks?${params.toString()}`,{
+        try { const response = await fetch(`api/dailyTasks?${taskId}`,{
             method: 'DELETE',
             headers: {
                 'Content-type': 'application/json'  
@@ -316,7 +342,7 @@ export default {
             if(!a.active && b.active) return -1;
             return a.id - b.id;
         });
-        this.updateDailyTask(taskId,this.tasks[taskId-1].text,!this.tasks[taskId-1].isActive);
+        this.updateDailyTaskStatus(taskId);
     },
     getTaskImage(isActive){
         return isActive ? this.checkBoxActive : this.checkBoxUnactive;
@@ -349,7 +375,7 @@ export default {
             if(!a.active && b.active) return -1;
             return a.id - b.id;
         });
-        this.updateDailyTask(habitId,this.habits[habitId-1].text,!this.habits[habitId-1].isActive);
+        this.updateDailyTaskStatus(habitId,this.habits[habitId-1].text,!this.habits[habitId-1].isActive);
     },
     getHabitImage(isActiveHabit){
         return isActiveHabit ? this.checkBoxActive : this.checkBoxUnactive;
