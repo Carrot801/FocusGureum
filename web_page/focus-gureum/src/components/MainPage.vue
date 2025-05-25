@@ -44,7 +44,7 @@
             <div class="habit-container">
                 <h3>Habit Goals</h3>
                 <div v-for ="habit in habits" :key="habit.id" class="habit"
-                :class="{active: habit.active}" @click="toggleHabit(habit.id)">
+                :class="{active: habit.isActive}" @click="toggleHabit(habit.id)">
                 <img :src="getHabitImage(habit.isActive)" alt="Habit Checkbox" class="toggle-image" />
                 <span> {{ habit.text }}</span>
                 </div>
