@@ -70,19 +70,19 @@
                 </div>
                 <div class="scrollable-container">
                 <div class="gallery">
-
                    <router-link
-  v-for="(image,index) in gallery"
-  :key="index"
-  :to="{ name: 'GalleryItemDetail', params: { name: image.name } }"
-  class="gallery-item"
->
-  <img :src="image.imgUrl" alt="Gallery Image" />
-  <span>Image {{ image.name }}</span>
-</router-link>
+                      v-for="(image,index) in gallery"
+                      :key="index"
+                      :to="{ name: 'GalleryItemDetail', params: { name: image.name } }"
+                      class="gallery-item"
+                    >
+                  <img :src="image.imgUrl" alt="Gallery Image" />
+                  <span>Image {{ image.name }}</span>
+                </router-link>
 
                     </div>  
                 </div>
+                
                 <div v-if="showGalleryWindow" class="gallery-item-window">
                     <div class="gallery-item-content">
 
@@ -97,6 +97,7 @@
                         <h3>Add Gallery Item</h3>
                     </div>
                 </div>
+
             </div>
 
             
@@ -743,7 +744,6 @@ h2 {
     height: 40px;
     display: flex;
     align-items: center;
-    text-align: left;
     justify-content: space-between;
     padding: 0 0 0 10px; 
     background-color: #f6cdcd85;
