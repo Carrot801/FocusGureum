@@ -2,8 +2,8 @@
     <div class = "mainPage">
 
         <div id="app">
-    <router-view />
-  </div>
+            <router-view />
+        </div>
         <!-- Banner -->
         <img src = "../assets/image.png" alt="Banner" class="banner" />
         <!-- Profile Picture -->
@@ -11,7 +11,6 @@
 
         <h2>User's Name Page</h2>
 
-        {{ }}
         <!-- Current Month and Year -->
         <h3>{{ month }} {{ year }}</h3>
 
@@ -71,13 +70,13 @@
                 <div class="scrollable-container">
                 <div class="gallery">
                    <router-link
-                      v-for="(image,index) in gallery"
+                      v-for="(item,index) in gallery"
                       :key="index"
-                      :to="{ name: 'GalleryItemDetail', params: { name: image.name } }"
+                      :to="{ name: 'GalleryItemDetail', params: { name: item.name } }"
                       class="gallery-item"
                     >
-                  <img :src="image.imgUrl" alt="Gallery Image" />
-                  <span>Image {{ image.name }}</span>
+                  <img :src="item.imgUrl" alt="Gallery Image" />
+                  <span>{{ item.name }}</span>
                 </router-link>
 
                     </div>  
@@ -127,63 +126,7 @@ export default {
         showGalleryWindow: false,
         checkBoxUnactive: require('@/assets/checkbox-unactive.png'),
         checkBoxActive: require('@/assets/checkbox-active.png'),
-        gallery: [
-            {        
-                id: 1,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {      
-                id: 2,  
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 3,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 4,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 5,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 6,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 7,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 8,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 9,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 10,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-            {        
-                id: 11,
-                imgUrl: require('@/assets/checkbox-unactive.png'),
-                name: "Image 1",
-            },
-        ],
+        gallery: [ ],
         tasks: [ ],
         habits: [
             {        
@@ -250,7 +193,6 @@ export default {
             }
             else {
                 const data = await response.text();
-                console.log(data);
                 const tasks = JSON.parse(data);
                 this.tasks = tasks.map(task => ({
                     id: task.id,
@@ -282,8 +224,8 @@ export default {
             }
             else {
                 const data = await response.text();
-                this.getDailyTasks();
                 console.log(data);
+                this.getDailyTasks();
             }
         }catch(error){
             console.error("There was a problem with the fetch operation:", error);
@@ -306,8 +248,8 @@ export default {
             }
             else {
                 const data = await response.text();
-                this.getDailyTasks();
                 console.log(data);
+                this.getDailyTasks();
             }
         }catch(error){
             console.error("There was a problem with the fetch operation:", error);
@@ -334,6 +276,62 @@ export default {
             console.error("There was a problem with the fetch operation:", error);
         }
     },
+     async getGalleryItem(){
+        try{
+            const response = await fetch("api/categories",{
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.json();
+                console.log(data);
+                const gallery = JSON.parse(data);
+                this.gallery = gallery.map(item => {
+                    const blob = item.imgUrl.blob();
+                    return {
+                        id: item.id,
+                        name: item.name,
+                        imgUrl: URL.createObjectURL(blob),
+                    }
+                });
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
+    async postGalleryItem(name,imageUrl){
+        try{
+            const response = await fetch("api/categories/create",{
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    name: name,
+                    status: false,
+                    imagePath: imageUrl,
+                    user: 1,
+                }),
+            }); 
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                this.getGalleryItem();
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
     toggleTask(taskId){
         this.tasks = this.tasks.map(task => 
             task.id === taskId ? {...task, active: !task.active,isActive: !task.isActive} : task
@@ -358,12 +356,6 @@ export default {
     addTask(){
         if(this.newTaskText.trim()){
             this.postDailyTask(this.newTaskText,false);
-            const newTask = {
-                id: this.tasks.length + 1,
-                text: this.newTaskText,
-                isActive: false,
-            };
-            this.tasks.push(newTask);
             this.cancelTask();
         }
     },
@@ -439,12 +431,7 @@ export default {
     },
     addGalleryItem(){
         if(this.newGalleryItemText.trim() && this.imagePreview){
-            const newItem = {
-                id: this.gallery.length + 1,
-                imgUrl: this.imagePreview,
-                name: this.newGalleryItemText,
-            };
-            this.gallery.push(newItem);
+            this.postGalleryItem(this.newGalleryItemText, this.imagePreview,);
             this.cancelGalleryItem();
         }else {
             alert("Please select an image and enter a name.");
@@ -466,6 +453,7 @@ export default {
   },
   mounted() {
     this.getDailyTasks();
+    this.getGalleryItem();
   },
 }
 </script>

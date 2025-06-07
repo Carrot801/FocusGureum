@@ -1,8 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainPage from '../components/MainPage.vue'
 import GalleryItemDetail from '../components/GalleryItemDetail.vue'
+import SignInPage from '@/components/SignInPage.vue'
+import SignUpPage from '@/components/SignUpPage.vue'
 
 const routes = [
+  {
+    path: '/signin',
+    name: 'SignInPage',
+    component: SignInPage,
+  },
+    {
+    path: '/signup',
+    name: 'SignUpPage',
+    component: SignUpPage,
+  },
   {
     path: '/',
     name: 'Home',
