@@ -3,6 +3,7 @@ import MainPage from '../components/MainPage.vue'
 import GalleryItemDetail from '../components/GalleryItemDetail.vue'
 import SignInPage from '@/components/SignInPage.vue'
 import SignUpPage from '@/components/SignUpPage.vue'
+import HabbitTracker  from '@/components/HabbitTrackerPage.vue'
 
 const routes = [
   {
@@ -15,16 +16,21 @@ const routes = [
     name: 'SignUpPage',
     component: SignUpPage,
   },
+   {
+    path: '/habbit-tracker',
+    name: 'HabbitTracker',
+    component: HabbitTracker,
+  },
   {
     path: '/',
     name: 'Home',
     component: MainPage,
   },
   {
-    path: '/gallery/:name',
+    path: '/gallery/:name:id?',
     name: 'GalleryItemDetail',
     component: GalleryItemDetail,
-    props: true, // This will pass the name param as a prop to GalleryItemDetail
+    props: true, 
   },
 ]
 

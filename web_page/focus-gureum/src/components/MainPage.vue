@@ -20,7 +20,13 @@
         <div class="task-container">
             <h3>Daily Goals</h3>
             <div v-for ="task in tasks" :key="task.id" class="task"
-            :class="{active: task.isActive}" @click="toggleTask(task.id)">
+            :class="{active: task.isActive,
+            'swiping-left': task.swipingLeft }"
+            :style="swipedTaskId === task.id && dragging ? 'transform: translateX(' + (currentX - touchStartX) + 'px)' : ''"
+            @click="toggleTask(task.id)"
+            @mousedown="startMouse($event, task.id,true)"
+            @mouseup="endMouse($event,true)"
+            >
             <img :src="getTaskImage(task.isActive)" alt="Task Checkbox" class="toggle-image" />
             <span> {{ task.text }}</span>
             </div>
@@ -42,8 +48,16 @@
         <div class="habit-goals">
             <div class="habit-container">
                 <h3>Habit Goals</h3>
-                <div v-for ="habit in habits" :key="habit.id" class="habit"
-                :class="{active: habit.isActive}" @click="toggleHabit(habit.id)">
+                <div
+                v-for="habit in habits"
+                :key="habit.id"
+                class="habit"
+                :class="{ active: habit.isActive, 'swiping-left': habit.swipingLeft }"
+                :style="swipedHabitId === habit.id && dragging ? 'transform: translateX(' + (currentX - touchStartX) + 'px)' : ''"
+                @click="toggleHabit(habit.id)"
+                @mousedown="startMouse($event, habit.id,false)"
+                @mouseup="endMouse($event,false)"
+                >
                 <img :src="getHabitImage(habit.isActive)" alt="Habit Checkbox" class="toggle-image" />
                 <span> {{ habit.text }}</span>
                 </div>
@@ -72,7 +86,9 @@
                    <router-link
                       v-for="(item,index) in gallery"
                       :key="index"
-                      :to="{ name: 'GalleryItemDetail', params: { name: item.name } }"
+                      :to="item.id === 0
+                      ? {name: 'HabbitTracker' }
+                      : { name: 'GalleryItemDetail', params: { name: item.name, id: item.id } }"
                       class="gallery-item"
                     >
                   <img :src="item.imgUrl" alt="Gallery Image" />
@@ -85,19 +101,18 @@
                 <div v-if="showGalleryWindow" class="gallery-item-window">
                     <div class="gallery-item-content">
 
-                        <!-- File Input -->
-                        <input type="file" @change="handleFileUpload" accept="image/*" class="file-input" />
+                        File Input 
+                         <input type="file" @change="handleFileUpload" accept="image/*" class="file-input" />
 
                         <input v-model="newGalleryItemText" type="text" placeholder = "Enter the name " class="new-task-input"/>
                         <div class="task-button">
                             <button @click="addGalleryItem" class="add-task">Add</button>
                             <button @click="cancelGalleryItem" class="cancel-task">Cancel</button>
                         </div>
-                        <h3>Add Gallery Item</h3>
                     </div>
                 </div>
 
-            </div>
+            </div> 
 
             
     </div>
@@ -117,6 +132,12 @@ export default {
     return {
         month: months[currentDate.getMonth()],
         year: currentDate.getFullYear(),
+        touchEndX: 0,
+        touchStartX: 0,
+        currentX: 0,
+        dragging: false,
+        swipedHabitId: null,
+        swipedTaskId: null,
         isActive: false,
         isAddingTask: false,
         newTaskText: '',
@@ -126,25 +147,12 @@ export default {
         showGalleryWindow: false,
         checkBoxUnactive: require('@/assets/checkbox-unactive.png'),
         checkBoxActive: require('@/assets/checkbox-active.png'),
-        gallery: [ ],
+        gallery: [],
         tasks: [ ],
         habits: [
-            {        
-                id: 1,
-                text: "Habit 1",
-                isActive: false,
-            },
-            {        
-                id: 2,
-                text: "Habit 2",
-                isActive: false,
-            },
-            {        
-                id: 3,
-                text: "Habit 3",
-                isActive: false,
-            },
-        ],
+            { id: 0,name: "Habits",imgUrl: require('@/assets/checkbox-active.png'),}
+         ],
+
     }
   },
   computed:{
@@ -156,16 +164,63 @@ export default {
     },
   },
   methods:{
-    async postDailyTask(description,status){
+    startMouse(e, habitId,isTask) {
+    this.touchStartX = e.clientX;
+    this.currentX = e.clientX;
+    this.dragging = true;
+    if (isTask) {
+        this.swipedTaskId = habitId;
+    } else {
+        this.swipedHabitId = habitId;
+    }
+
+    document.addEventListener("mousemove", this.onMouseMove);
+    this.boundMouseUp = (e) => this.endMouse(e, isTask);
+    document.addEventListener("mouseup", this.boundMouseUp);
+
+    },
+
+    onMouseMove(e) {
+    if (this.dragging) {
+        this.currentX = e.clientX;
+    }
+    },
+
+    endMouse(e, isTask) {
+    document.removeEventListener("mousemove", this.onMouseMove);
+    document.removeEventListener("mouseup", this.boundMouseUp);
+
+    const swipeDistance = this.touchStartX - this.currentX;
+
+    if (isTask && swipeDistance > 100 && this.swipedTaskId !== null) {
+        this.deleteDailyTask(this.swipedTaskId);
+    } else if (!isTask && swipeDistance > 100 && this.swipedHabitId !== null) {
+        this.deleteHabit(this.swipedHabitId);
+    }
+
+    this.dragging = false;
+    this.swipedHabitId = null;
+    this.swipedTaskId = null;
+    this.currentX = 0;
+    },
+    beforeDestroy() {
+    document.removeEventListener("mousemove", this.onMouseMove);
+    if (this.boundMouseUp) {
+        document.removeEventListener("mouseup", this.boundMouseUp);
+    }
+    },
+        async postDailyTask(description,status){
         try{
-            const response = await fetch("api/tasks?id=1",{
-                method: 'POST',
+        const response = await fetch(`/api/tasks/create`, {
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
                 body: JSON.stringify({
                     description: description,
                     status: status,
+                    categoryId: 2,
                 }),
             }); 
             if(!response.ok){
@@ -174,6 +229,7 @@ export default {
             else {
                 const data = await response.text();
                 console.log(data);
+                this.getDailyTasks();
             }
         }catch(error){
             console.error("There was a problem with the fetch operation:", error);
@@ -182,10 +238,11 @@ export default {
     },
     async getDailyTasks(){
         try{
-            const response = await fetch("api/tasks",{
+            const response = await fetch(`/api/tasks/2`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
             });
             if(!response.ok){
@@ -213,10 +270,11 @@ export default {
     async updateDailyTaskStatus(taskId){
 
         try{
-             const response = await fetch(`api/tasks/${taskId}/toggle`,{
+             const response = await fetch(`api/tasks/${0}/${taskId}/toggle`,{
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
             });
             if(!response.ok){
@@ -234,10 +292,11 @@ export default {
     async updateDailyTaskName(taskId){
 
         try{
-             const response = await fetch(`api/tasks/${taskId}/name`,{
+             const response = await fetch(`/api/tasks/${taskId}/name`,{
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
                 body: JSON.stringify({
                     name: this.tasks[taskId-1].text,
@@ -256,14 +315,12 @@ export default {
         }
     },
     async deleteDailyTask(taskId){
-        try { const response = await fetch(`api/dailyTasks?${taskId}`,{
+        try { const response = await fetch(`/api/tasks/1/${taskId}/delete`,{
             method: 'DELETE',
             headers: {
-                'Content-type': 'application/json'  
-            },
-            body: JSON.stringify({
-                id: taskId,
-            }),
+                'Content-type': 'application/json',
+                "Authorization": "Bearer " + localStorage.getItem('authToken'),
+            }
         });
         if(!response.ok){
             console.error("Netwrork response was not ok " + response.statusText);
@@ -276,47 +333,52 @@ export default {
             console.error("There was a problem with the fetch operation:", error);
         }
     },
-     async getGalleryItem(){
-        try{
-            const response = await fetch("api/categories",{
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            if(!response.ok){
-                throw new Error("Network response was not ok" + response.statusText);
-            }
-            else {
-                const data = await response.json();
-                console.log(data);
-                const gallery = JSON.parse(data);
-                this.gallery = gallery.map(item => {
-                    const blob = item.imgUrl.blob();
-                    return {
-                        id: item.id,
-                        name: item.name,
-                        imgUrl: URL.createObjectURL(blob),
-                    }
-                });
-            }
-        }catch(error){
-            console.error("There was a problem with the fetch operation:", error);
+    async getGalleryItem() {
+    try {
+        const response = await fetch("/api/categories", {
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json',
+            "Authorization": "Bearer " + localStorage.getItem('authToken'),
+        },
+        });
+
+        if (!response.ok) {
+        throw new Error("Network response was not ok: " + response.statusText);
         }
-        
+
+        const data = await response.json();
+        console.log(data);
+        const gallery = data.map(item => ({
+            id: item.id + 1,
+            name: item.name,
+            imgUrl: require('@/assets/checkbox-unactive.png')
+            }));
+             this.gallery = [
+            {
+                id: 0,
+                name: "Habits",
+                imgUrl: require('@/assets/checkbox-active.png'),
+            },
+            ...gallery
+            ];
+
+    } catch (error) {
+        console.error("There was a problem with the fetch operation:", error);
+    }
     },
     async postGalleryItem(name,imageUrl){
         try{
-            const response = await fetch("api/categories/create",{
+            const response = await fetch("/api/categories/create",{
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
                 body: JSON.stringify({
                     name: name,
-                    status: false,
                     imagePath: imageUrl,
-                    user: 1,
+                    userId: 1,
                 }),
             }); 
             if(!response.ok){
@@ -368,7 +430,7 @@ export default {
             if(!a.active && b.active) return -1;
             return a.id - b.id;
         });
-        this.updateDailyTaskStatus(habitId,this.habits[habitId-1].text,!this.habits[habitId-1].isActive);
+        this.updateHabitStatus(habitId);
     },
     getHabitImage(isActiveHabit){
         return isActiveHabit ? this.checkBoxActive : this.checkBoxUnactive;
@@ -383,40 +445,108 @@ export default {
     addHabit(){
         if(this.newHabitText.trim()){
             this.postHabit(this.newHabitText,false);
-            const newHabit = {
-                id: this.habits.length + 1,
-                text: this.newHabitText,
-                isActive: false,
-            };
-            this.habits.push(newHabit);
             this.cancelHabit();
         }
     },
     
-    async postHabit(description,status){
+    async postHabit(description){
         try{
-            const response = await fetch("api/dailyTasks",{
-                method: 'POST',
+            const response = await fetch("api/habits/create",{
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
                 },
                 body: JSON.stringify({
-                    description: description,
-                    status: status,
+                    name: description,
+                    createdAt: new Date().toISOString().slice(0, 19),
+                    active: true,
+                    user: 1,
                 }),
             }); 
             if(!response.ok){
                 throw new Error("Network response was not ok" + response.statusText);
             }
             else {
-                const data = await response.text();
-                console.log(data);
+                this.getDailyHabit();
             }
         }catch(error){
             console.error("There was a problem with the fetch operation:", error);
         }
         
     },
+     async getDailyHabit(){
+        try{
+            const response = await fetch(`/api/habitschedule/today`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.json(); 
+                this.habits = data.map((name, index) => ({
+                id: index,
+                text: name,
+                isActive: false,
+                swipingLeft: false,
+                }));
+                this.habits.sort((a,b) => {
+                    if(a.isActive && !b.isActive) return 1;
+                    if(!a.isActive && b.isActive) return -1;
+                    return a.id - b.id;
+                });
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
+     async deleteHabit(habitId){
+        try { const response = await fetch(`api/habits/${habitId}/delete`,{
+            method: 'DELETE',
+            headers: {
+                'Content-type': 'application/json',
+                "Authorization": "Bearer " + localStorage.getItem('authToken'),
+            }
+        });
+        if(!response.ok){
+            console.error("Netwrork response was not ok " + response.statusText);
+        }else {
+            const data = await response.text();
+            console.log(data);
+            this.getDailyHabit();
+        }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
+    async updateHabitStatus(habitId){
+
+        try{
+             const response = await fetch(`api/habits/${habitId}/toggle`,{
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.json();
+                console.log(data);
+                this.getDailyHabit();
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },    
     startAddingGalleryItem(){
         this.showGalleryWindow = true;
         this.newGalleryItemText = '';
@@ -454,6 +584,7 @@ export default {
   mounted() {
     this.getDailyTasks();
     this.getGalleryItem();
+    this.getDailyHabit();
   },
 }
 </script>
@@ -520,20 +651,20 @@ h2 {
     height: 18px;
     padding:10px;
     gap: 10px;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
     background-color: white;
     transition: background-color 0.3s;
     cursor: pointer;
 }
 .task:hover{
-    background-color: #f27bbe;
+    background-color: var(--color-thridary);
 }
 .task.active{
-    background-color: #f7c4e1;
+    background-color: var(--color-primary);
 }
 .task.active:hover{
-    background-color: #a28f9a;
+    background-color: var(--color-focus);
 }
 .add-task-button{
     width: 220px;
@@ -543,11 +674,11 @@ h2 {
     justify-content: center;
     align-items: center;
     padding: 10px;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
     margin-top: 10px;
     margin-left: 10px;
-    background-color: #f7c4e1;
+    background-color: var(--color-secondary);
 }
 .new-task{
     width: 250px;
@@ -573,9 +704,9 @@ h2 {
     height: 18px;
     padding:10px;
     gap: 10px;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
-    background-color: white;
+    background-color: var(--color-primary);
     transition: background-color 0.3s;
     cursor: pointer;
 }
@@ -585,9 +716,9 @@ h2 {
     height: 40px;
     align-items: center;
     cursor: pointer;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent)b;
     border-radius: 10px;
-    background-color: #f7c4e1;
+    background-color: var(--color-secondary);
 }
 
 
@@ -614,34 +745,35 @@ h2 {
     height: 18px;
     padding:10px;
     gap: 10px;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
     background-color: white;
     transition: background-color 0.3s;
     cursor: pointer;
 }
 .habit:hover{
-    background-color: #f27bbe;
+    background-color: var(--color-thridary);
 }
 .habit.active{
-    background-color: #f7c4e1;
+    background-color: var(--color-primary);
 }
 .habit.active:hover{
-    background-color: #a28f9a;
+    background-color: var(--color-focus);
 }
 .add-habit-button{
     width: 220px;
     height: 40px; 
     cursor: pointer;
     display: flex;
+    left: 50%;
+    transform: translate(25%);
     justify-content: center;
     align-items: center;
     padding: 10px;
-    border: 1px solid gray;
+    border: 3px solid  var(--color-accent);
     border-radius: 10px;
     margin-top: 10px;
-    margin-left: 10px;
-    background-color: #f7c4e1;
+    background-color: var(--color-secondary);
 }
 .new-habit{
     width: 250px;
@@ -657,19 +789,20 @@ h2 {
     width: 250px;
     display: flex;
     align-items: center;
+    justify-content: center;
+    margin-left: 30px;
     gap: 10px;
-    margin-left: 15px;
 }
 .new-habit-input{
-    width: 220px;
+    width: 310px;
     display: flex;
     align-items: center;
     height: 18px;
     padding:10px;
     gap: 10px;
-    border: 1px solid gray;
+    border: 1px solid  var(--color-accent);
     border-radius: 10px;
-    background-color: white;
+    background-color:  var(--color-primary);
     transition: background-color 0.3s;
     cursor: pointer;
 }
@@ -679,9 +812,14 @@ h2 {
     height: 40px;
     align-items: center;
     cursor: pointer;
-    border: 1px solid gray;
+    border: 1px solid  var(--color-accent);
     border-radius: 10px;
-    background-color: #f7c4e1;
+    background-color:  var(--color-secondary)
+}
+.habit.swiping-left {
+  transform: translateX(-100px);
+  transition: transform 0.3s ease;
+  opacity: 0.5;
 }
 .scrollable-gallery-container {
   overflow-x: auto; 
@@ -711,7 +849,7 @@ h2 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #f3f3f3;
+  background: var(--color-primary);
   padding: 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -723,7 +861,7 @@ h2 {
   width: 200px;
   height: 165px;
   border-radius: 10px;
-  border: 1px solid gray;
+  border: 1px solid var(--color-accent);
   object-fit: cover;
 }
 
@@ -734,7 +872,8 @@ h2 {
     align-items: center;
     justify-content: space-between;
     padding: 0 0 0 10px; 
-    background-color: #f6cdcd85;
+    background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+    color: black;
     border-radius: 8px;
 }
 
@@ -744,7 +883,7 @@ h2 {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #f7c4e1;
+    background-color: var(--color-primary);
     border-radius: 8px;
     padding: 10px;
     cursor: pointer;

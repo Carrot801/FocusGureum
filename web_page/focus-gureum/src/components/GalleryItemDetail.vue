@@ -1,19 +1,24 @@
 <template>
-  <div>
+  <div class="scrollable-container">
     <div class="container">
        <div class="banner" >
     <span>
-      <p>Focus Gureum</p>
+      <p>{{ name }}</p>
     </span>
-            <div class="task-add-item " @click="startAddingGalleryItem">
-              <span>➕ </span> 
-            </div>
+      <div class="task-add-item " @click="startAddingGalleryItem">
+        <span>➕ </span> 
+      </div>
     </div>
       <div class="scrollable-container">
-      <div class="task-container">
-            <h3>{{ name }}</h3>
+        <div class="task-container">
             <div v-for ="task in tasks" :key="task.id" class="task"
-            :class="{active: task.isActive}" @click="toggleTask(task.id)">
+            :class="{active: task.isActive,
+            'swiping-left': task.swipingLeft }"
+            :style="swipedTaskId === task.id && dragging ? 'transform: translateX(' + (currentX - touchStartX) + 'px)' : ''"
+            @click="toggleTask(task.id)"
+            @mousedown="startMouse($event, task.id,true)"
+            @mouseup="endMouse($event,true)"
+            >
             <img :src="getTaskImage(task.isActive)" alt="Task Checkbox" class="toggle-image" />
             <span> {{ task.text }}</span>
             </div>
@@ -36,55 +41,32 @@
 
 <script>
 export default {
-  props: ['name'],
+  props: ['name','id'],
   data(){
     return{
       showGalleryWindow: false,
       newGalleryItemText: '',
       isAddingTask: false,
+      dragging: false,
+      swipedTaskId: null,
+      currentX: 0,
       newTaskText: '',
       checkBoxUnactive: require('@/assets/checkbox-unactive.png'),
-        checkBoxActive: require('@/assets/checkbox-active.png'),
-        tasks: [
-            {        
-                id: 1,
-                text: "Complete the daily task",
-                isActive: false,
-            },
-            {      
-                id: 2,  
-                text: "Complete the daily task",
-                isActive: false,
-            },
-            {        
-                id: 3,
-                text: "Complete the daily task",
-                isActive: false,
-            },
-            {        
-                id: 4,
-                text: "Complete the sdfdfssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssfds sdffds daily task",
-                isActive: false,
-            },
-            {        
-                id: 5,
-                text: "Complete the daily task",
-                isActive: false,
-            },
-            {        
-                id: 6,
-                text: "Complete the daily task",
-                isActive: false,
-            },
-        ],
+      checkBoxActive: require('@/assets/checkbox-active.png'),
+        tasks: [],
     }
   },
-   computed:{
-    taskCheckbox(){
-        return this.isActive ? this.checkBoxActive : this.checkBoxUnactive;
-    },
+   computed(){
+    this.taskCheckbox();
+    this.getDailyTasks();
+  },
+  mounted(){
+    console.log(this.id);
   },
   methods: {
+    taskCheckbox(){
+      return this.isActive ? this.checkBoxActive : this.checkBoxUnactive;
+    },
      toggleTask(taskId){
         this.tasks = this.tasks.map(task => 
             task.id === taskId ? {...task, active: !task.active,isActive: !task.isActive} : task
@@ -94,6 +76,51 @@ export default {
             if(!a.active && b.active) return -1;
             return a.id - b.id;
         });
+    },
+  startMouse(e, habitId,isTask) {
+    this.touchStartX = e.clientX;
+    this.currentX = e.clientX;
+    this.dragging = true;
+    if (isTask) {
+        this.swipedTaskId = habitId;
+    } else {
+        this.swipedHabitId = habitId;
+    }
+
+    document.addEventListener("mousemove", this.onMouseMove);
+    this.boundMouseUp = (e) => this.endMouse(e, isTask);
+    document.addEventListener("mouseup", this.boundMouseUp);
+
+    },
+
+    onMouseMove(e) {
+    if (this.dragging) {
+        this.currentX = e.clientX;
+    }
+    },
+
+    endMouse(e, isTask) {
+    document.removeEventListener("mousemove", this.onMouseMove);
+    document.removeEventListener("mouseup", this.boundMouseUp);
+
+    const swipeDistance = this.touchStartX - this.currentX;
+
+    if (isTask && swipeDistance > 100 && this.swipedTaskId !== null) {
+        this.deleteDailyTask(this.swipedTaskId);
+    } else if (!isTask && swipeDistance > 100 && this.swipedHabitId !== null) {
+        this.deleteHabit(this.swipedHabitId);
+    }
+
+    this.dragging = false;
+    this.swipedHabitId = null;
+    this.swipedTaskId = null;
+    this.currentX = 0;
+    },
+    beforeDestroy() {
+    document.removeEventListener("mousemove", this.onMouseMove);
+    if (this.boundMouseUp) {
+        document.removeEventListener("mouseup", this.boundMouseUp);
+    }
     },
     getTaskImage(isActive){
         return isActive ? this.checkBoxActive : this.checkBoxUnactive;
@@ -109,14 +136,7 @@ export default {
     },
     addTask(){
         if(this.newTaskText.trim()){
-            // this.postDailyTask(this.newTaskText,false);
-            const newTask = {
-                id: this.tasks.length + 1,
-                text: this.newTaskText,
-                isActive: false,
-            };
-            this.tasks.push(newTask);
-            this.cancelTask();
+            this.postDailyTask(this.id,this.newTaskText,false);
         }
     },
      startAddingGalleryItem(){
@@ -132,15 +152,101 @@ export default {
         this.imagePreview = null;
         this.selectedImage = null;
     },
+    deleteTask(id) {
+      this.tasks = this.tasks.filter(t => t.id !== id);
+    },
+        async postDailyTask(description,status){
+        try{
+          const response = await fetch(`/api/tasks/create`, {
+            method: 'PATCH',
+              headers: {
+                  'Content-Type': 'application/json',
+                  "Authorization": "Bearer " + localStorage.getItem('authToken'),
+              },
+              body: JSON.stringify({
+                  description: description,
+                  status: status,
+                  categoryId: this.id,
+              }),
+            }); 
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                console.log(data);
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
+    async getDailyTasks(){
+        try{
+          console.log(`/api/tasks/${this.id}`);
+            const response = await fetch(`/api/tasks/${this.id}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                const tasks = JSON.parse(data);
+                this.tasks = tasks.map(task => ({
+                    id: task.id,
+                    text: task.name,
+                    isActive: task.status,
+                }));
+                this.tasks.sort((a,b) => {
+                    if(a.isActive && !b.isActive) return 1;
+                    if(!a.isActive && b.isActive) return -1;
+                    return a.id - b.id;
+                });
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+        
+    },
+    async updateDailyTaskStatus(taskId){
+
+        try{
+             const response = await fetch(`api/tasks/${0}/${taskId}/toggle`,{
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
+                },
+            });
+            if(!response.ok){
+                throw new Error("Network response was not ok" + response.statusText);
+            }
+            else {
+                const data = await response.text();
+                console.log(data);
+                this.getDailyTasks();
+            }
+        }catch(error){
+            console.error("There was a problem with the fetch operation:", error);
+        }
+    },
   }
 }
 
 </script>
 
 <style scoped>
-
+p{
+  font-size: 16px;
+  font-weight: bold;
+  color: black
+}
 .scrollable-container {
-  overflow: auto;
+  overflow: hidden;
   scrollbar-color: #f7c4e1 #f3f3f3;
 }
 
@@ -149,22 +255,21 @@ export default {
 }
 
 .container{
-  background-color: #ffecf6;
+  background-color: #ffffff;
   border-radius: 15px;
-  border-color: rgb(142, 91, 190);
+  border-color: var(--color-accent);
   border-width: 3px;
   border-style: solid;
   width: 99%;
   height: 510px;
-  overflow-y: auto;
 }
 
 .banner {
   position: relative;
   top: 0;
   margin-left: 0;
-  background-color: var(--color-primary); 
-  color: white;
+  background: linear-gradient(to right, var(--color-primary), var(--color-secondary));
+  color: black;
   font-weight: bold;
   text-align: left;
   display: flex;
@@ -182,24 +287,25 @@ export default {
   margin-right: 5px;
   align-items: center;
   justify-content: center;
-  background-color: #ffeaf6;
+  background-color: var(--color-primary);
   border-radius: 8px;
   padding: 10px;
   cursor: pointer;
 }
 .task-container {
+  margin-top: 15px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  height: 460px;
+  height: 445px;
   overflow: auto;
   position: relative;
 }
 
 .toggle-image{
-    width: 25px;
-    height: 25px;
-    cursor: pointer;
+  width: 25px;
+  height: 25px;
+  cursor: pointer;
 }
 .task {
   margin-left: 10px;
@@ -208,8 +314,8 @@ export default {
   padding: 10px 15px;
   text-align: left;
   gap: 10px;
-  border: 1px solid gray;
-  border-radius: 10px;
+  border: 3px solid var(--color-accent);
+  border-radius: 15px;
   background-color: white;
   transition: background-color 0.3s;
   cursor: pointer;
@@ -221,13 +327,13 @@ export default {
 }
 
 .task:hover{
-    background-color: #f27bbe;
+    background-color: var(--color-thridary);
 }
 .task.active{
-    background-color: #f7c4e1;
+    background-color: var(--color-primary);
 }
 .task.active:hover{
-    background-color: #a28f9a;
+    background-color: var(--color-focus);
 }
 .add-task,
 .cancel-task{
@@ -236,9 +342,9 @@ export default {
     height: 40px;
     align-items: center;
     cursor: pointer;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
-    background-color: #f7c4e1;
+    background-color: var(--color-secondary);
 }
 .new-task-input{
     margin: 20px;
@@ -248,7 +354,7 @@ export default {
     height: 18px;
     padding:10px;
     gap: 10px;
-    border: 1px solid gray;
+    border: 3px solid var(--color-accent);
     border-radius: 10px;
     background-color: white;
     transition: background-color 0.3s;

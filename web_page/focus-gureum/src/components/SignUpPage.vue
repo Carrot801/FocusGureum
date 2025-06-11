@@ -5,13 +5,12 @@
         <h1>Create account</h1>
       </div>
       <div class="sign-in-container">
-        <input
-          v-model="email"
-          :class="['email-input', emailError ? 'input-error' : '']"
-          type="text"
-          placeholder="Enter your email"
-        />
-        <div v-if="emailError" class="error-message">Login is required.</div>
+      <input
+        v-model="nickname"
+        :class="['email-input', emailError ? 'input-error' : '']"
+        type="text"
+        placeholder="Enter your nickname"
+      />
 
         <input
         v-model="password"
@@ -25,25 +24,25 @@
         class="eye-icon"
         alt="Toggle Password Visibility"
         />
-        <div v-if="passwordError" class="error-message">Password is required.      
-        </div>
-
         <input
           v-model="repeatedPassword"
           :class="['password-input', repeatedPasswordError ? 'input-error' : '']"
           :type=" 'password'"
           placeholder="Repeat your password"    
         />
-            
-        <div v-if="repeatedPasswordError" class="error-message">Password is required.      
-        
-        </div>
+          
+        <span v-if="passwordError" class="error-message">
+          Password must be at least 8 characters long.
+        </span>
+        <span v-if="repeatedPasswordError" class="repeated-error-message">
+          Password must be the same as the first one.
+        </span>
 
       </div>
       <div>
         <button
           class="signup-button"
-          @click="handleSignIn"
+          @click="registerUser"
         >
           Sign Up
         </button>
@@ -59,14 +58,21 @@
 
 
 <script>
+// import { create } from 'core-js/core/object';
+// import { routeLocationKey } from 'vue-router';
+import {getToken} from'@/utils'
+import validator from 'validator';
 export default {
+  
     name: 'SignInPage',
     data() {
         return {
+            nickname: '',
             password: '',
             repeatedPassword: '',
             repeatedPasswordError: false,
             login: '',
+            nicknameError: false,
             emailError: false,
             passwordError: false,
             showPassword: false,
@@ -77,16 +83,52 @@ export default {
     computed: {
         isFormValid() {
             return this.login.trim() !== '' && this.password.trim() !== '';
+        },
+        isPasswordValid() {
+          return validator.isLength(this.password, { min: 8 });
+        },
+        isSamePassword() {
+          return this.repeatedPassword === this.password;
         }
     },
     methods: {
-        handleSignIn() {
-            this.emailError = this.login.trim() === '';
-            this.passwordError = this.password.trim() === '';
+        async registerUser() {
+          this.nicknameError = this.nickname.trim() === '';
+          this.passwordError = !this.isPasswordValid;
+          this.repeatedPasswordError = this.repeatedPassword !== this.password;
 
-            if (this.isFormValid) {
-                alert('Logging in...');
+          if (
+            this.nicknameError ||
+            this.passwordError ||
+            this.repeatedPasswordError
+          ) {
+            return;
+          }
+
+          try {
+            const response = await fetch('/auth/addNewUser', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                nickname: this.nickname,
+                avator: '',
+                email: '',
+                password: this.password,
+                role: "ROLE_USER",
+                createdAt: new Date().toISOString()
+              }),
+            });
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.statusText}`);
             }
+            await getToken(this.nickname,this.password,this.$router);
+            const result = await response.text();
+            console.log(result);
+          } catch (error) {
+            console.error('Error registering user:', error);
+          }
         },
         togglePasswordVisibility(){
             this.showPassword = !this.showPassword;
@@ -165,8 +207,16 @@ export default {
   font-size: 12px;
   margin-top: 5px;
   position: absolute;
-  left: 0;
-  top: 100%;
+  left: 40px;
+  top: 230px;
+}
+.repeated-error-message{
+  color: red;
+  font-size: 12px;
+  margin-top: 5px;
+  position: absolute;
+  left: 40px;
+  top: 315px;
 }
 .signup-button {
     position: relative;

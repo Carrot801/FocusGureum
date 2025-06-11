@@ -6,12 +6,14 @@
       </div>
       <div class="sign-in-container">
         <input
-          v-model="email"
+          v-model="nickname"
           :class="['email-input', emailError ? 'input-error' : '']"
           type="text"
-          placeholder="Enter your email"
+          placeholder="Enter your nickname"
         />
-        <div v-if="emailError" class="error-message">Login is required.</div>
+        <span v-if="emailError" class="nickname-error-message">
+          Login is required.
+        </span>
 
         <input
         v-model="password"
@@ -25,9 +27,12 @@
         class="eye-icon"
         alt="Toggle Password Visibility"
         />
-        <div v-if="passwordError" class="error-message">Password is required.      
-        
-        </div>
+        <span v-if="passwordError" class="error-message">
+          Password must be at least 8 characters long.
+        </span>
+         <span v-if="invalidPassword" class="error-message">
+          Invalid password.
+        </span>
 
       </div>
       <div>
@@ -49,11 +54,14 @@
 
 
 <script>
+import validator from 'validator';
+import {getToken} from '@/utils'
 export default {
     name: 'SignInPage',
     data() {
         return {
             password: '',
+            Password:'',
             login: '',
             emailError: false,
             passwordError: false,
@@ -64,16 +72,21 @@ export default {
     },
     computed: {
         isFormValid() {
-            return this.login.trim() !== '' && this.password.trim() !== '';
-        }
+            return this.nickname.trim() !== '';
+        },
+        isPasswordValid() {
+          return validator.isLength(this.password, { min: 8 });
+        },
     },
     methods: {
-        handleSignIn() {
-            this.emailError = this.login.trim() === '';
-            this.passwordError = this.password.trim() === '';
+        async handleSignIn() {
+            this.emailError = this.nickname.trim() === '';
+            this.passwordError = !this.isPasswordValid;
 
-            if (this.isFormValid) {
-                alert('Logging in...');
+            if(this.isFormValid && this.isPasswordValid){
+              await getToken(this.nickname,this.password,this.$router);
+            console.log('a');
+
             }
         },
         togglePasswordVisibility(){
@@ -147,14 +160,20 @@ export default {
 .input-error {
   border-color: red;
 }
-
 .error-message {
   color: red;
   font-size: 12px;
   margin-top: 5px;
   position: absolute;
-  left: 0;
-  top: 100%;
+  left: 40px;
+  top: 230px;
+}
+.nickname-error-message {
+  color: red;
+  font-size: 12px;
+  position: absolute;
+  left: 40px;
+  top: 150px;
 }
 .signup-button {
     position: relative;
