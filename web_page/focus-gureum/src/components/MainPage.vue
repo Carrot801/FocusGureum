@@ -209,31 +209,31 @@ export default {
         document.removeEventListener("mouseup", this.boundMouseUp);
     }
     },
-        async postDailyTask(description,status){
-        try{
-        const response = await fetch(`/api/tasks/create`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    "Authorization": "Bearer " + localStorage.getItem('authToken'),
-                },
-                body: JSON.stringify({
-                    description: description,
-                    status: status,
-                    categoryId: 2,
-                }),
-            }); 
-            if(!response.ok){
-                throw new Error("Network response was not ok" + response.statusText);
-            }
-            else {
-                const data = await response.text();
-                console.log(data);
-                this.getDailyTasks();
-            }
-        }catch(error){
-            console.error("There was a problem with the fetch operation:", error);
+    async postDailyTask(description,status){
+    try{
+    const response = await fetch(`/api/tasks/create`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                "Authorization": "Bearer " + localStorage.getItem('authToken'),
+            },
+            body: JSON.stringify({
+                name: description,
+                status: status,
+                categoryId: 2,
+            }),
+        }); 
+        if(!response.ok){
+            throw new Error("Network response was not ok" + response.statusText);
         }
+        else {
+            const data = await response.text();
+            console.log(data);
+            this.getDailyTasks();
+        }
+    }catch(error){
+        console.error("There was a problem with the fetch operation:", error);
+    }
         
     },
     async getDailyTasks(){
@@ -268,9 +268,8 @@ export default {
         
     },
     async updateDailyTaskStatus(taskId){
-
         try{
-             const response = await fetch(`api/tasks/${0}/${taskId}/toggle`,{
+             const response = await fetch(`api/tasks/${2}/${taskId}/toggle`,{
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
@@ -417,7 +416,7 @@ export default {
     },
     addTask(){
         if(this.newTaskText.trim()){
-            this.postDailyTask(this.newTaskText,false);
+            this.postDailyTask(this.newTaskText.trim(),false);
             this.cancelTask();
         }
     },
@@ -444,7 +443,7 @@ export default {
     },
     addHabit(){
         if(this.newHabitText.trim()){
-            this.postHabit(this.newHabitText,false);
+            this.postHabit(this.newHabitText.trim(),false);
             this.cancelHabit();
         }
     },
@@ -461,7 +460,7 @@ export default {
                     name: description,
                     createdAt: new Date().toISOString().slice(0, 19),
                     active: true,
-                    user: 1,
+                    userId: 1,
                 }),
             }); 
             if(!response.ok){
